@@ -39,57 +39,45 @@ else:
 
 PHONE_NUMBER = 877
 
-class Tickets:
-	'''Manages saved tickets'''
+class Ticket:
+	'''Manages a saved ticket'''
 
 	if SYMBIAN:
-		TICKETS_PATH = 'e:\\data\\python\\resources\\mobile_ticket\\active_tickets.txt'
+		TICKETS_PATH = 'e:\\data\\python\\resources\\mobile_ticket\\ticket.txt'
 	else:
-		TICKETS_PATH = os.path.normpath('../data/active_tickets.txt')
-	TICKET_SEPERATOR = '!@#$%^&*'
+		TICKETS_PATH = os.path.normpath('../data/ticket.txt')
 	EXPIRE_PATTERN = r'Дійсний до: (?P<hours>\d{1,2}):(?P<minutes>\d{2}) (?P<day>\d{1,2}).(?P<month>\d{2}).(?P<year>\d{4})'
 
 	def __init__(self):
-		self._pattern = re.compile(Tickets.EXPIRE_PATTERN)
-		self._tickets = []
-		self._pos = 0
+		self._pattern = re.compile(Ticket.EXPIRE_PATTERN)
+		self._ticket = ''
 
 	def _get_rid_of_expired_tickets(self):
-		tickets = []
-		for t in self.all_tickets:
-			m = self._pattern.match(t)
-			assert m, 'malformed ticket'
-			exire_time = datetime(*tuple(m.group(1)))
-			if exire_time > datetime.now():
-				tickets.append(t)
-		self._tickets = tickets
+		m = self._pattern.match(self._ticket)
+		assert m, 'malformed ticket'
+		exire_time = datetime(*tuple(m.group(1)))
+		if exire_time < datetime.now():
+			self._ticket = ''
 
-	def get_next(self):
-		if not len(self._tickets) \
-			and os.path.exists(Tickets.TICKETS_PATH) \
-			and os.path.isfile(Tickets.TICKETS_PATH) \
-			and os.path.getsize(os.path.isfile(Tickets.TICKETS_PATH)):
-			f = open(Tickets.TICKETS_PATH, 'rw')
-			for l in f.readline():
-				t = ''
-				if l == Tickets.TICKET_SEPERATOR:
-					self._tickets.append(t)
-				else:
-					t += l
+	def get_content(self):
+		if self._ticket == '' \
+			and os.path.exists(Ticket.TICKETS_PATH) \
+			and os.path.isfile(Ticket.TICKETS_PATH) \
+			and os.path.getsize(os.path.isfile(Ticket.TICKETS_PATH)):
+			f = open(Ticket.TICKETS_PATH, 'rw')
+			self._ticket = f.readline()
 			f.close()
 
 		self._get_rid_of_expired_tickets()
 
-		return self._tickets
+		return self._ticket
 	
-	def add(self, ticket):
-		self._tickets.append(ticket)
+	def set(self, ticket):
+		self._tickets = ticket
 
 	def save(self):
 		f = open(DB.TICKETS_PATH, 'w')
-		for t in self._tickets:
-			f.write(t)
-			f.write(SMS.TICKET_SEPERATOR)
+		f.write(self._ticket)
 		f.close()
 
 
@@ -108,7 +96,7 @@ class DB:
 	def _check_db_file(self):
 		return os.path.exists(DB.DB_PATH) and os.path.isfile(DB.DB_PATH)
 
-	def get_last_error_msg(self):
+	def get_last_err_msg(self):
 		return self._last_err_msg
 
 	def get_help(self):
@@ -257,7 +245,7 @@ class MobileTicket:
 			appuifw.note(self._db.get_last_err_msg(), 'info')
 			assert 0, self._db.get_help()
 		
-		self._tickets = Tickets()
+		self._ticket = Ticket()
 
 		self._states = {
 			'list':{
@@ -265,6 +253,7 @@ class MobileTicket:
 				'body': Listbox(self._db.get_transport_types(), self.at_list_handler),
 				'menu': [
 					(u'Select', self.at_list_handler),
+					(u'Show the ticket', self.at_show_ticket)
 					(u'Help', self.at_help),
 					(u'Info', self.about),
 				],
@@ -304,7 +293,7 @@ class MobileTicket:
 	def _cb_ticket_recieved(self, ticket):
 		appuifw.note(u'Your e-ticket has arrived!', 'conf')
 		self._states['text'].set_text(ticket)
-		self._tickets.add(ticket)
+		self._ticket.set(ticket)
 
 	def run(self):
 		self._set_state(self._states['list'])
@@ -318,12 +307,17 @@ class MobileTicket:
 		if not idx == None:
 			self._send_request(self._db.get_code(trans_type), routes[idx])
 
+	def at_show_ticket(self):
+		ticket = self._ticket.get_content()
+		if ticket:
+			self._states['text'].set_text(ticket)
+			self._ticket.set(ticket)
+		else:
+			appuifw.note(u'No ticket', 'error')
+
 	def at_back(self):
 		self._set_state(self._states['list'])
 
-	def at_next(self):
-		self._states['text'].set_text(set)
-		
 	def at_help(self):
 		appuifw.note(u'1. Select a transport.\n2. Select a route.\n3. Wait for a ticket.', 'info')
 
@@ -332,7 +326,7 @@ class MobileTicket:
 
 	def quit(self):
 		self._db.disconnect()
-		self._tickets.save_tickets()
+		self._ticket.save()
 		appuifw.app.exit_key_handler = None
 		self._script_lock.signal()
 

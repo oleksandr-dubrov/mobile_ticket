@@ -1,0 +1,6 @@
+*.pyc
+*~
+notes.txt
+.pydevproject
+.settings/*
+.project

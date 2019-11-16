@@ -8,6 +8,10 @@ The application is delivered with a data base that holds all routes number of al
 
 Some useful links
 ------------------
+[depo.vn.ua](http://depo.vn.ua/news/novyy-servis-oplata-proyizdu-za-dopomogoyu-sms)
+
 [kyivstar](https://kyivstar.ua/uk/mm/news-and-promotions/u-vinnyci-za-dopomogoyu-kyyivstar-zapustyly-servis-sms-oplaty-za-proyizd-v)
+
 [lifecell](https://www.lifecell.ua/uk/mobilnij-zvyazok/korysni-poslugy/sms-kvytok/)
+
 [vodafone](https://www.vodafone.ua/uk/privatnim-klientam/services/finance/sms-ticket)

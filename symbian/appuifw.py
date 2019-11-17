@@ -195,3 +195,6 @@ EHCenterVBottom = 5
 EHRightVTop = 6
 EHRightVCenter = 7
 EHRightVBottom = 8
+
+HIGHLIGHT_SHADOW = 0
+HIGHLIGHT_ROUNDED = 1

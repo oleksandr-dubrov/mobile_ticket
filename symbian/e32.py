@@ -8,4 +8,8 @@ def ao_sleep(n):
 	time.sleep(n)
 
 def Ao_lock():  # @IgnorePep8 @DontTrace
-	return None
+	return Lock()
+
+class Lock(object):
+	def wait(self):
+		pass

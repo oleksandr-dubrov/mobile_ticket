@@ -1,6 +1,5 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
-from asn1crypto.core import InstanceOf
 
 __version__ = '1.0'
 __author__ = 'Olexandr Dubrov <olexandr.dubrov@gmail.com>'
@@ -37,7 +36,17 @@ else:
 	import symbian.inbox as inbox  # @Reimport
 	import symbian.messaging as messaging  # @Reimport
 
-PHONE_NUMBER = 877
+PHONE_NUMBER = '877'
+
+
+# ####################################
+# ###################################
+# def sms_send(number, msg, callback=None, name=None):
+# 	callback(messaging.ESent)
+# 
+# messaging.sms_send = sms_send
+# ###################################
+# ####################################
 
 class Ticket:
 	'''Manages a saved ticket'''
@@ -45,39 +54,46 @@ class Ticket:
 	if SYMBIAN:
 		TICKETS_PATH = 'e:\\data\\python\\resources\\mobile_ticket\\ticket.txt'
 	else:
-		TICKETS_PATH = os.path.normpath('../data/ticket.txt')
-	EXPIRE_PATTERN = r'Дійсний до: (?P<hours>\d{1,2}):(?P<minutes>\d{2}) (?P<day>\d{1,2}).(?P<month>\d{2}).(?P<year>\d{4})'
+		TICKETS_PATH = os.path.normpath('data/ticket.txt')
+	EXPIRE_PATTERN = u'Дійсний до: (?P<hours>\d{1,2}):(?P<minutes>\d{2}) (?P<day>\d{1,2}).(?P<month>\d{2}).(?P<year>\d{4})'
 
 	def __init__(self):
-		self._pattern = re.compile(Ticket.EXPIRE_PATTERN)
+		self._pattern = re.compile(Ticket.EXPIRE_PATTERN, re.UNICODE)
 		self._ticket = ''
+		if not (os.path.exists(Ticket.TICKETS_PATH) and os.path.isfile(Ticket.TICKETS_PATH)):
+			self.save()
 
 	def _get_rid_of_expired_tickets(self):
+		print self._ticket
 		m = self._pattern.match(self._ticket)
 		assert m, 'malformed ticket'
-		exire_time = datetime(*tuple(m.group(1)))
+		exire_time = datetime(int(m.group('year')),
+							int(m.group('month')),
+							int(m.group('day')),
+							hour=int(m.group('hours')),
+							minute=int(m.group('minutes')))
+		print exire_time
+		print datetime.now()
 		if exire_time < datetime.now():
 			self._ticket = ''
 
 	def get_content(self):
-		if self._ticket == '' \
-			and os.path.exists(Ticket.TICKETS_PATH) \
-			and os.path.isfile(Ticket.TICKETS_PATH) \
-			and os.path.getsize(os.path.isfile(Ticket.TICKETS_PATH)):
-			f = open(Ticket.TICKETS_PATH, 'rw')
-			self._ticket = f.readline()
+		if self._ticket == '' and os.path.getsize(Ticket.TICKETS_PATH):
+			f = open(Ticket.TICKETS_PATH, 'r')
+			self._ticket = unicode(f.read())
 			f.close()
-
-		self._get_rid_of_expired_tickets()
+		
+		if self._ticket:
+			self._get_rid_of_expired_tickets()
 
 		return self._ticket
 	
 	def set(self, ticket):
-		self._tickets = ticket
+		self._ticket = ticket
 
 	def save(self):
-		f = open(DB.TICKETS_PATH, 'w')
-		f.write(self._ticket)
+		f = open(Ticket.TICKETS_PATH, 'w')
+		f.write(self._ticket.encode('utf-8'))
 		f.close()
 
 
@@ -87,7 +103,7 @@ class DB:
 	if SYMBIAN:
 		DB_PATH = 'e:\\data\\python\\resources\\mobile_ticket\\mobtick.bd'
 	else:
-		DB_PATH = os.path.normcase('../data/mobtick.bd')
+		DB_PATH = os.path.normcase('data/mobtick.bd')
 
 	def __init__(self):
 		self._last_err_msg = ''
@@ -109,15 +125,18 @@ The db file should be shipped with the application.
 
 	def connect(self):
 		if not self._check_db_file():
-			self._last_err_msg = u'The DB file %s is not found. See console output for more information.'%DB.DB_PATH
+			self._last_err_msg = u'The DB file %s is not found. See console output for more info.'%DB.DB_PATH
 			return False
 		f = open(DB.DB_PATH, 'r');
-		for line in f.readline():
+		for line in f.readlines():
 			if line.startswith('#'):
 				continue
 			lst = line.strip().split(',')
-			self._data.append({'type': lst[0], 'code': lst[1], 'routes': lst[2:]})
+			self._data.append({'type': unicode(lst[0]),
+								'code': unicode(lst[1]),
+								'routes': [unicode(x) for x in lst[2:]]})
 		f.close()
+		return True
 
 	def disconnect(self):
 		pass
@@ -126,17 +145,17 @@ The db file should be shipped with the application.
 		return [e['type'] for e in self._data]
 
 	def get_routes(self, transport_type):
-		return [e for e in self._data if e['type'] == transport_type]['routes']
+		return [e for e in self._data if e['type'] == transport_type][0]['routes']
 						
 	def get_code(self, transport_type):
-		return [e for e in self._data if e['type'] == transport_type]['code']
+		return [e for e in self._data if e['type'] == transport_type][0]['code']
 
 class Listbox():
 	'''Extends appuifw Listbox'''
 
 	def __init__(self, init_list, cb_handler):
 		self._lst = init_list
-		self._ui_list = appuifw.Listbox(self.lst, cb_handler)
+		self._ui_list = appuifw.Listbox(self._lst, cb_handler)
 		self._ui_list.bind(0x35, cb_handler) # bind the handler to key 5
 		self._ui_list.bind(0x32, self.cb_focus_up) # bind the handler to key 2
 		self._ui_list.bind(0x38, self.cb_focus_down) # bind the handler to key 8
@@ -165,32 +184,6 @@ class Listbox():
 		return self._ui_list
 
 
-class Textbox(appuifw.Text):
-	'''Extends appuifw Text'''
-
-	def get_body(self):
-		ph = \
-		u'''
-      +--------------------+         
-      |******              |         
-      |******              |         
-      |   Разовий кивток   |         
-      |    для проїзду     |         
-      |                    |         
-      | ТРАМВАЙ            |         
-      | ТРОЛЕЙБУС          |         
-      | АВТОБУС            |         
-      |      ####          |         
-      |     #    #         |         
-      |     #    # ГРН     |         
-      |      ####          |         
-      |--------------------|         
-      |      012409        |         
-      +--------------------+         
-		'''
-		self.set(ph)
-		return self
-
 class SMS:
 	'''Works with the SMS service'''
 	SUCCESS_REQUEST = ['Дякуємо за заявку.', 'Oчікуйте SMS']
@@ -214,21 +207,34 @@ class SMS:
 
 	@staticmethod
 	def compose_txt(code, route):
-		return '%s%s'(code, route)
+		return '%s%s'%(code, route)
 
 	def send(self, msg):
 		sent = False
 
 		def _cb_sent(state):
-			if state==messaging.ESent:
+			if state == messaging.ESent:
 				sent = True
 			if state in [messaging.EScheduleFailed, messaging.ESendFailed, messaging.EFatalServerError]:
 				sent = False
 
-		messaging.sms_send(PHONE_NUMBER, msg, callback=_cb_sent, name="e-ticket")
+		#messaging.sms_send(PHONE_NUMBER, msg, callback=_cb_sent, name="e-ticket")
 
-		box = inbox.Inbox()
-		box.bind(self._message_received)
+		#### box = inbox.Inbox()
+		#### box.bind(self._message_received)
+
+		################################
+		
+		self._cb_ticket_recieved(u'''Оплата проїзду успішна!
+Код перевірки: № 31284122
+Маршрут: №6a
+Транспорт: Тролейбус
+Місто: Вінниця
+Сума: 4 грн
+Дійсний до: 00:38 17.11.2019
+-------------------------------
+Швидкі перекази та платежі на сайті: kv.st/sm-catalog''')
+		################################
 
 		return sent
 
@@ -242,35 +248,32 @@ class MobileTicket:
 
 		self._db = DB()
 		if not self._db.connect():
-			appuifw.note(self._db.get_last_err_msg(), 'info')
+			appuifw.note(self._db.get_last_err_msg(), 'error')
 			assert 0, self._db.get_help()
-		
 		self._ticket = Ticket()
+		self._body = None
 
-		self._states = {
-			'list':{
-				'title': u'Мобільний квиток',
-				'body': Listbox(self._db.get_transport_types(), self.at_list_handler),
-				'menu': [
+	def _set_list_body(self):
+		lst = Listbox(self._db.get_transport_types(), self.at_list_handler)
+		appuifw.app.title = u'Мобільний квиток'
+		appuifw.app.body = lst.get_body()
+		appuifw.app.menu = [
 					(u'Select', self.at_list_handler),
-					(u'Show the ticket', self.at_show_ticket)
+					(u'Show the ticket', self.at_show_ticket),
 					(u'Help', self.at_help),
 					(u'Info', self.about),
-				],
-			},
-			'text':{
-				'title': u'Дійсний квиток',
-				'body': appuifw.Text(u''),
-				'menu': [
-					(u'Back', self.at_back),
-				],
-			},
-		}
+				]
+		self._body = lst
 
-	def _set_state(self, state):
-		appuifw.app.title = state['title']
-		appuifw.app.body = state['body'].get_body()
-		appuifw.app.menu = state['menu']
+	def _set_text_body(self):
+		txt = appuifw.Text()
+		txt.font = "annotation"
+		appuifw.app.title = u'Дійсний квиток'
+		appuifw.app.body = txt
+		appuifw.app.menu = [
+					(u'Back', self.at_back),
+				]
+		self._body = txt
 
 	def _send_request(self, code, route):
 		sms = SMS(self._cb_info_received, self._cb_ticket_recieved)
@@ -279,29 +282,30 @@ class MobileTicket:
 		i.show(u'Please wait for a while.', (0, 0), 60000, 0, appuifw.EHRightVCenter)
 		success = sms.send(txt)
 		i.hide()
-		if success:
-			i.show(u'Wait a minute or so for a ticket', (0, 0), 5*60000, 0, appuifw.EHRightVCenter)
-			if len(self._tickets.get()):
-				self._states['text']['menu'].append((u'Next ticket', self.at_next))
-			self._set_state(self._states['text'])
-		else:
-			appuifw.note(u'Failed to send request. Try again later.', 'error')
+# 		if success:
+# 			i.show(u'Wait a minute or so for a ticket', (0, 0), 5*60000, 0, appuifw.EHRightVCenter)
+# 			self._set_text_body()
+# 		else:
+# 			appuifw.note(u'Failed to send request. Try again later.', 'error')
 
 	def _cb_info_received(self, msg):
-		self._states['text'].set_text(msg)
+		self._set_text_body()
+		self._body.set(msg)
 	
 	def _cb_ticket_recieved(self, ticket):
 		appuifw.note(u'Your e-ticket has arrived!', 'conf')
-		self._states['text'].set_text(ticket)
+		self._set_text_body()
+		self._body.set(ticket)
+		self._body.set_pos(39)
 		self._ticket.set(ticket)
 
 	def run(self):
-		self._set_state(self._states['list'])
+		self._set_list_body()
 		self._script_lock = e32.Ao_lock()
 		self._script_lock.wait()
 
 	def at_list_handler(self):
-		trans_type = self.states['list']['body'].current_item()
+		trans_type = self._body.current_item()
 		routes = self._db.get_routes(trans_type)
 		idx = appuifw.selection_list(routes, search_field=1)
 		if not idx == None:
@@ -310,13 +314,14 @@ class MobileTicket:
 	def at_show_ticket(self):
 		ticket = self._ticket.get_content()
 		if ticket:
-			self._states['text'].set_text(ticket)
+			self._set_text_body()
+			self._body.set(ticket)
 			self._ticket.set(ticket)
 		else:
 			appuifw.note(u'No ticket', 'error')
 
 	def at_back(self):
-		self._set_state(self._states['list'])
+		self._set_list_body()
 
 	def at_help(self):
 		appuifw.note(u'1. Select a transport.\n2. Select a route.\n3. Wait for a ticket.', 'info')

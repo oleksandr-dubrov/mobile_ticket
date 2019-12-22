@@ -20,8 +20,6 @@ __license__ = '''
 
 import os
 import sys
-import re
-from datetime import datetime
 
 SYMBIAN = sys.platform == 'symbian_s60'
 
@@ -39,15 +37,6 @@ else:
 PHONE_NUMBER = '877'
 
 
-# ####################################
-# ###################################
-# def sms_send(number, msg, callback=None, name=None):
-# 	callback(messaging.ESent)
-# 
-# messaging.sms_send = sms_send
-# ###################################
-# ####################################
-
 class Ticket:
 	'''Manages a saved ticket'''
 
@@ -55,37 +44,18 @@ class Ticket:
 		TICKETS_PATH = 'e:\\data\\python\\resources\\mobile_ticket\\ticket.txt'
 	else:
 		TICKETS_PATH = os.path.normpath('data/ticket.txt')
-	EXPIRE_PATTERN = u'Дійсний до: (?P<hours>\d{1,2}):(?P<minutes>\d{2}) (?P<day>\d{1,2}).(?P<month>\d{2}).(?P<year>\d{4})'
 
 	def __init__(self):
-		self._pattern = re.compile(Ticket.EXPIRE_PATTERN, re.UNICODE)
 		self._ticket = ''
 		if not (os.path.exists(Ticket.TICKETS_PATH) and os.path.isfile(Ticket.TICKETS_PATH)):
 			self.save()
 
-	def _get_rid_of_expired_tickets(self):
-		print self._ticket
-		m = self._pattern.match(self._ticket)
-		assert m, 'malformed ticket'
-		exire_time = datetime(int(m.group('year')),
-							int(m.group('month')),
-							int(m.group('day')),
-							hour=int(m.group('hours')),
-							minute=int(m.group('minutes')))
-		print exire_time
-		print datetime.now()
-		if exire_time < datetime.now():
-			self._ticket = ''
-
 	def get_content(self):
 		if self._ticket == '' and os.path.getsize(Ticket.TICKETS_PATH):
 			f = open(Ticket.TICKETS_PATH, 'r')
-			self._ticket = unicode(f.read())
+			self._ticket = f.read().decode('utf-8')
 			f.close()
 		
-		if self._ticket:
-			self._get_rid_of_expired_tickets()
-
 		return self._ticket
 	
 	def set(self, ticket):
@@ -192,6 +162,7 @@ class SMS:
 	def __init__(self, cb_info_received, cb_ticket_recieved):
 		self._cb_info_received = cb_info_received
 		self._cb_ticket_recieved = cb_ticket_recieved
+		self._sent = False 
 
 	def _message_received(self, msg_id):
 		box = inbox.Inbox()
@@ -210,33 +181,18 @@ class SMS:
 		return '%s%s'%(code, route)
 
 	def send(self, msg):
-		sent = False
-
 		def _cb_sent(state):
 			if state == messaging.ESent:
-				sent = True
+				self._sent = True
 			if state in [messaging.EScheduleFailed, messaging.ESendFailed, messaging.EFatalServerError]:
-				sent = False
+				self._sent = False
 
-		#messaging.sms_send(PHONE_NUMBER, msg, callback=_cb_sent, name="e-ticket")
+		messaging.sms_send(PHONE_NUMBER, msg, callback=_cb_sent, name="e-ticket")
 
-		#### box = inbox.Inbox()
-		#### box.bind(self._message_received)
+		box = inbox.Inbox()
+		box.bind(self._message_received)
 
-		################################
-		
-		self._cb_ticket_recieved(u'''Оплата проїзду успішна!
-Код перевірки: № 31284122
-Маршрут: №6a
-Транспорт: Тролейбус
-Місто: Вінниця
-Сума: 4 грн
-Дійсний до: 00:38 17.11.2019
--------------------------------
-Швидкі перекази та платежі на сайті: kv.st/sm-catalog''')
-		################################
-
-		return sent
+		return self._sent
 
 
 class MobileTicket:
@@ -282,11 +238,11 @@ class MobileTicket:
 		i.show(u'Please wait for a while.', (0, 0), 60000, 0, appuifw.EHRightVCenter)
 		success = sms.send(txt)
 		i.hide()
-# 		if success:
-# 			i.show(u'Wait a minute or so for a ticket', (0, 0), 5*60000, 0, appuifw.EHRightVCenter)
-# 			self._set_text_body()
-# 		else:
-# 			appuifw.note(u'Failed to send request. Try again later.', 'error')
+		if success:
+			i.show(u'Wait a minute or so for a ticket', (0, 0), 5*60000, 0, appuifw.EHRightVCenter)
+			self._set_text_body()
+		else:
+			appuifw.note(u'Failed to send request. Try again later.', 'error')
 
 	def _cb_info_received(self, msg):
 		self._set_text_body()

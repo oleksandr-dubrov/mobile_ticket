@@ -1,7 +1,7 @@
 MOBILE TICKET
 =============
 
-The application helps to pay the fare by SMS in some cities of Ukraine.
+The application helps to pay the fare by SMS in some Vinnytsia.
 The SMS is composed by the information about a transport type and a route and sent to 877.
 
 The application is delivered with a data base that holds all routes number of all transport types where the fare can be paid by SMS.

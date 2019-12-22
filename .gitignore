@@ -4,3 +4,4 @@ notes.txt
 .pydevproject
 .settings/*
 .project
+bin/*

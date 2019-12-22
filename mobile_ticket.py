@@ -27,44 +27,12 @@ if SYMBIAN:
 	import e32  # @UnresolvedImport @UnusedImport
 	import appuifw  # @UnresolvedImport @UnusedImport
 	import messaging	# @UnresolvedImport @UnusedImport
-	import inbox	# @UnresolvedImport @UnusedImport
 else:
 	import symbian.appuifw as appuifw  # @Reimport
 	import symbian.e32 as e32  # @Reimport
-	import symbian.inbox as inbox  # @Reimport
 	import symbian.messaging as messaging  # @Reimport
 
 PHONE_NUMBER = '877'
-
-
-class Ticket:
-	'''Manages a saved ticket'''
-
-	if SYMBIAN:
-		TICKETS_PATH = 'e:\\data\\python\\resources\\mobile_ticket\\ticket.txt'
-	else:
-		TICKETS_PATH = os.path.normpath('data/ticket.txt')
-
-	def __init__(self):
-		self._ticket = ''
-		if not (os.path.exists(Ticket.TICKETS_PATH) and os.path.isfile(Ticket.TICKETS_PATH)):
-			self.save()
-
-	def get_content(self):
-		if self._ticket == '' and os.path.getsize(Ticket.TICKETS_PATH):
-			f = open(Ticket.TICKETS_PATH, 'r')
-			self._ticket = f.read().decode('utf-8')
-			f.close()
-		
-		return self._ticket
-	
-	def set(self, ticket):
-		self._ticket = ticket
-
-	def save(self):
-		f = open(Ticket.TICKETS_PATH, 'w')
-		f.write(self._ticket.encode('utf-8'))
-		f.close()
 
 
 class DB:
@@ -156,43 +124,14 @@ class Listbox():
 
 class SMS:
 	'''Works with the SMS service'''
-	SUCCESS_REQUEST = ['Дякуємо за заявку.', 'Oчікуйте SMS']
-	ETICKET_HEADER = ['Оплата проїзду успішна!']
-	
-	def __init__(self, cb_info_received, cb_ticket_recieved):
-		self._cb_info_received = cb_info_received
-		self._cb_ticket_recieved = cb_ticket_recieved
-		self._sent = False 
-
-	def _message_received(self, msg_id):
-		box = inbox.Inbox()
-		sender = box.address(msg_id)
-		if sender == PHONE_NUMBER:
-			msg = box.content(msg_id)
-			if SMS.SUCCESS_REQUEST[0] in msg and SMS.SUCCESS_REQUEST[1] in msg:
-				box.delete(msg_id)
-				self._cb_info_received(msg)
-			if SMS.ETICKET_HEADER in msg:
-				self._cb_ticket_recieved(msg)
-			self._cb_info_received(msg)
 
 	@staticmethod
 	def compose_txt(code, route):
 		return '%s%s'%(code, route)
 
-	def send(self, msg):
-		def _cb_sent(state):
-			if state == messaging.ESent:
-				self._sent = True
-			if state in [messaging.EScheduleFailed, messaging.ESendFailed, messaging.EFatalServerError]:
-				self._sent = False
-
-		messaging.sms_send(PHONE_NUMBER, msg, callback=_cb_sent, name="e-ticket")
-
-		box = inbox.Inbox()
-		box.bind(self._message_received)
-
-		return self._sent
+	@staticmethod
+	def send(msg):
+		messaging.sms_send(PHONE_NUMBER, msg, callback=None, name="e-ticket")
 
 
 class MobileTicket:
@@ -206,7 +145,6 @@ class MobileTicket:
 		if not self._db.connect():
 			appuifw.note(self._db.get_last_err_msg(), 'error')
 			assert 0, self._db.get_help()
-		self._ticket = Ticket()
 		self._body = None
 
 	def _set_list_body(self):
@@ -215,45 +153,16 @@ class MobileTicket:
 		appuifw.app.body = lst.get_body()
 		appuifw.app.menu = [
 					(u'Select', self.at_list_handler),
-					(u'Show the ticket', self.at_show_ticket),
 					(u'Help', self.at_help),
 					(u'Info', self.about),
 				]
 		self._body = lst
 
-	def _set_text_body(self):
-		txt = appuifw.Text()
-		txt.font = "annotation"
-		appuifw.app.title = u'Дійсний квиток'
-		appuifw.app.body = txt
-		appuifw.app.menu = [
-					(u'Back', self.at_back),
-				]
-		self._body = txt
-
 	def _send_request(self, code, route):
-		sms = SMS(self._cb_info_received, self._cb_ticket_recieved)
-		txt = SMS.compose_txt(code, route)
 		i = appuifw.InfoPopup()
-		i.show(u'Please wait for a while.', (0, 0), 60000, 0, appuifw.EHRightVCenter)
-		success = sms.send(txt)
+		i.show(u'Please wait, sending is ongoing.', (0, 0), 60000, 0, appuifw.EHRightVCenter)
+		SMS.send(SMS.compose_txt(code, route))
 		i.hide()
-		if success:
-			i.show(u'Wait a minute or so for a ticket', (0, 0), 5*60000, 0, appuifw.EHRightVCenter)
-			self._set_text_body()
-		else:
-			appuifw.note(u'Failed to send request. Try again later.', 'error')
-
-	def _cb_info_received(self, msg):
-		self._set_text_body()
-		self._body.set(msg)
-	
-	def _cb_ticket_recieved(self, ticket):
-		appuifw.note(u'Your e-ticket has arrived!', 'conf')
-		self._set_text_body()
-		self._body.set(ticket)
-		self._body.set_pos(39)
-		self._ticket.set(ticket)
 
 	def run(self):
 		self._set_list_body()
@@ -266,28 +175,18 @@ class MobileTicket:
 		idx = appuifw.selection_list(routes, search_field=1)
 		if not idx == None:
 			self._send_request(self._db.get_code(trans_type), routes[idx])
-
-	def at_show_ticket(self):
-		ticket = self._ticket.get_content()
-		if ticket:
-			self._set_text_body()
-			self._body.set(ticket)
-			self._ticket.set(ticket)
-		else:
-			appuifw.note(u'No ticket', 'error')
-
-	def at_back(self):
-		self._set_list_body()
+			if not appuifw.query(u"Wait for a ticket from 877.\nBuy another ticket?", "query"):
+				appuifw.note(u'Bye.')
+				self.quit()
 
 	def at_help(self):
-		appuifw.note(u'1. Select a transport.\n2. Select a route.\n3. Wait for a ticket.', 'info')
+		appuifw.note(u'1. Select a transport.\n2. Select a route.\n3. Wait for a ticket from 877.', 'info')
 
 	def about(self):
 		appuifw.note(u'Mobile ticket v.%s' % __version__, 'info')
 
 	def quit(self):
 		self._db.disconnect()
-		self._ticket.save()
 		appuifw.app.exit_key_handler = None
 		self._script_lock.signal()
 

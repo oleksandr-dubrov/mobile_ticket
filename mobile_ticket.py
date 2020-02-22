@@ -19,18 +19,10 @@ __license__ = '''
 '''
 
 import os
-import sys
 
-SYMBIAN = sys.platform == 'symbian_s60'
-
-if SYMBIAN:
-	import e32  # @UnresolvedImport @UnusedImport
-	import appuifw  # @UnresolvedImport @UnusedImport
-	import messaging	# @UnresolvedImport @UnusedImport
-else:
-	import symbian.appuifw as appuifw  # @Reimport
-	import symbian.e32 as e32  # @Reimport
-	import symbian.messaging as messaging  # @Reimport
+import e32  # @UnresolvedImport @UnusedImport
+import appuifw  # @UnresolvedImport @UnusedImport
+import messaging # @UnresolvedImport @UnusedImport
 
 PHONE_NUMBER = '877'
 
@@ -38,10 +30,7 @@ PHONE_NUMBER = '877'
 class DB:
 	'''Manages the db'''
 
-	if SYMBIAN:
-		DB_PATH = 'e:\\data\\python\\resources\\mobile_ticket\\mobtick.bd'
-	else:
-		DB_PATH = os.path.normcase('data/mobtick.bd')
+	DB_PATH = 'e:\\data\\python\\resources\\mobile_ticket\\mobtick.bd'
 
 	def __init__(self):
 		self._last_err_msg = ''

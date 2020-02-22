@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-__version__ = '1.0'
+__version__ = '1.1'
 __author__ = 'Olexandr Dubrov <olexandr.dubrov@gmail.com>'
 __license__ = '''
 	Mobile ticket is free software: you can redistribute it and/or modify
@@ -77,6 +77,7 @@ The db file should be shipped with the application.
 		return True
 
 	def disconnect(self):
+		# nothing to do here
 		pass
 
 	def get_transport_types(self):

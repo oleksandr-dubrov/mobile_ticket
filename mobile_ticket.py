@@ -153,15 +153,16 @@ class MobileTicket:
 		appuifw.app.body = lst.get_body()
 		appuifw.app.menu = [
 					(u'Select', self.at_list_handler),
+					(u'Get a duplicate', self.at_get_dublicate),
 					(u'Help', self.at_help),
 					(u'Info', self.about),
 				]
 		self._body = lst
 
-	def _send_request(self, code, route):
+	def _send_request(self, msg):
 		i = appuifw.InfoPopup()
 		i.show(u'Please wait, sending is ongoing.', (0, 0), 60000, 0, appuifw.EHRightVCenter)
-		SMS.send(SMS.compose_txt(code, route))
+		SMS.send(msg)
 		i.hide()
 
 	def run(self):
@@ -174,10 +175,15 @@ class MobileTicket:
 		routes = self._db.get_routes(trans_type)
 		idx = appuifw.selection_list(routes, search_field=1)
 		if not idx == None:
-			self._send_request(self._db.get_code(trans_type), routes[idx])
+			self._send_request(SMS.compose_txt(self._db.get_code(trans_type), routes[idx]))
 			if not appuifw.query(u"Wait for a ticket from 877.\nBuy another ticket?", "query"):
 				appuifw.note(u'Bye.')
 				self.quit()
+
+	def at_get_dublicate(self):
+		self._send_request(u"D")
+		appuifw.note(u'Wait for a ticket from 877.\nBye.')
+		self.quit()
 
 	def at_help(self):
 		appuifw.note(u'1. Select a transport.\n2. Select a route.\n3. Wait for a ticket from 877.', 'info')

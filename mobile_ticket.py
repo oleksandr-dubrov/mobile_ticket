@@ -27,8 +27,41 @@ import messaging  # @UnresolvedImport @UnusedImport
 PHONE_NUMBER = '877'
 
 
+class Localizer:
+    '''Localize the string'''
+
+    UA = 'ua'
+    ENG = 'eng'
+    MOBILE_TICKET = u'Mobile ticket'
+    WAIT_FOR_A_TICKET = u'Wait for a ticket from %s.' % PHONE_NUMBER
+
+    def __init__(self, lang=ENG):
+        self._lang = lang
+        self._ua_strings = {
+            Localizer.MOBILE_TICKET: u'Мобільний квиток',
+            u'Select': u'Вибрати',
+            u'Get a duplicate': u'Отримати дублікат',
+            u'Help': u'Допомога',
+            u'Info': u'Інформація',
+            u'Please wait, sending is ongoing.':
+            u'Зачекайте, надсилання триває.',
+            u'Buy another ticket?': u'Купити ще один квиток?',
+            Localizer.WAIT_FOR_A_TICKET:
+            u'Чекайте квиток від %s.' % PHONE_NUMBER,
+            u'Bye.': u'До побачення.',
+            u'Select a transport.': u'Виберіть вид транспорту.',
+            u'Select a route.': u'Виберіть маршрут.',
+        }
+
+    def __call__(self, string):
+        if self._lang is Localizer.UA:
+            return self._ua_strings.get(string, string)
+        else:
+            return string
+
+
 class DB:
-    '''Manages the db'''
+    '''Manages the database'''
 
     DB_PATH = 'e:\\data\\python\\resources\\mobile_ticket\\mobtick.bd'
 
@@ -48,13 +81,14 @@ Each line in the file must be like this:
 transport type,transport code,rote 1,route 2,...,route N
 Example:
 tram,SAC,1,2,3,4,5,6
-The db file should be shipped with the application.
+The DB file should be shipped with the application.
 ''' % (os.path.dirname(DB.DB_PATH))
 
     def connect(self):
         if not self._check_db_file():
             emsg = u'The DB file %s is not found. ' +\
-                   u'See console output for more info.' % DB.DB_PATH
+                   u'See console output for more info.'
+            emsg = emsg % DB.DB_PATH
             self._last_err_msg = emsg
             return False
         f = open(DB.DB_PATH, 'r')
@@ -62,7 +96,7 @@ The db file should be shipped with the application.
             if line.startswith('#'):
                 continue
             lst = line.strip().split(',')
-            self._data.append({'type': unicode(lst[0]),
+            self._data.append({'type': unicode(lst[0], 'UTF-8'),
                                'code': unicode(lst[1]),
                                'routes': [unicode(x) for x in lst[2:]]})
         f.close()
@@ -145,22 +179,23 @@ class MobileTicket:
             appuifw.note(self._db.get_last_err_msg(), 'error')
             assert 0, self._db.get_help()
         self._body = None
+        self._loc = Localizer(Localizer.ENG)
 
     def _set_list_body(self):
         lst = Listbox(self._db.get_transport_types(), self.at_list_handler)
-        appuifw.app.title = u'Мобільний квиток'
+        appuifw.app.title = self._loc(Localizer.MOBILE_TICKET)
         appuifw.app.body = lst.get_body()
         appuifw.app.menu = [
-                    (u'Select', self.at_list_handler),
-                    (u'Get a duplicate', self.at_get_dublicate),
-                    (u'Help', self.at_help),
-                    (u'Info', self.about),
+                    (self._loc(u'Select'), self.at_list_handler),
+                    (self._loc(u'Get a duplicate'), self.at_get_dublicate),
+                    (self._loc(u'Help'), self.at_help),
+                    (self._loc(u'Info'), self.about),
                 ]
         self._body = lst
 
     def _send_request(self, msg):
         i = appuifw.InfoPopup()
-        i.show(u'Please wait, sending is ongoing.',
+        i.show(self._loc(u'Please wait, sending is ongoing.'),
                (0, 0),
                60000,
                0,
@@ -180,24 +215,29 @@ class MobileTicket:
         if idx is not None:
             self._send_request(SMS.compose_txt(self._db.get_code(trans_type),
                                                routes[idx]))
-            msg = u"Wait for a ticket from 877.\nBuy another ticket?"
-            if not appuifw.query(msg, "query"):
-                appuifw.note(u'Bye.')
+            msg1 = self._loc(Localizer.WAIT_FOR_A_TICKET)
+            msg2 = self._loc(u'Buy another ticket?')
+            if not appuifw.query(u'%s\n%s' % (msg1, msg2), "query"):
+                appuifw.note(self._loc(u'Bye.'))
                 self.quit()
 
     def at_get_dublicate(self):
         self._send_request(u"D")
-        appuifw.note(u'Wait for a ticket from 877.\nBye.')
+        msg1 = self._loc(Localizer.WAIT_FOR_A_TICKET)
+        msg2 = self._loc(u'Bye.')
+        appuifw.note(u'%s\n%s' % (msg1, msg2))
         self.quit()
 
     def at_help(self):
-        msg = u'1. Select a transport.\n' +\
-              u'2. Select a route.\n' +\
-              u'3. Wait for a ticket from 877.'
-        appuifw.note(msg, 'info')
+        msg1 = self._loc(u'Select a transport.')
+        msg2 = self._loc(u'Select a route.')
+        msg3 = self._loc(Localizer.WAIT_FOR_A_TICKET)
+        appuifw.note(u'1. %s\n2. %s\n3. %s' % (msg1, msg2, msg3), 'info')
 
     def about(self):
-        appuifw.note(u'Mobile ticket v.%s' % __version__, 'info')
+        appuifw.note(u'%s v.%s' % (self._loc(Localizer.MOBILE_TICKET),
+                                   __version__),
+                     'info')
 
     def quit(self):
         self._db.disconnect()

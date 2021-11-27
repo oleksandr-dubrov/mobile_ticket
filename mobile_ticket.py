@@ -179,7 +179,7 @@ class MobileTicket:
             appuifw.note(self._db.get_last_err_msg(), 'error')
             assert 0, self._db.get_help()
         self._body = None
-        self._loc = Localizer(Localizer.ENG)
+        self._loc = Localizer(Localizer.UA)
 
     def _set_list_body(self):
         lst = Listbox(self._db.get_transport_types(), self.at_list_handler)
